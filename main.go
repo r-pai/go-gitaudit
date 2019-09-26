@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	gitsearch "go-trufflehog/src"
+
+	gitsearch "github.com/r-pai/go-gitaudit/src"
 )
 
 func main() {

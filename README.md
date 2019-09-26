@@ -14,15 +14,11 @@
 # Installation
   go-gitaudit is built using Googles [golang](https://golang.org) and require golang installed in the system to run.
   
-  ```sh
-  go get -u github.com
-  ```
-
   Dependency package
   - gopkg.in/src-d/go-git.v4
   
 ```sh
-$ go get -u github.com/sergi/go-diff/...
+$ go get -u github.com/r-pai/go-gitaudit/...
 $ cd $GOPATH/src/github.com/r-pai/go-gitaudit
 $ go install
 $ go-gitaudit --giturl <url>
@@ -96,6 +92,6 @@ $./go-gitaudit --giturl=<url> --json=false
 # Issues
   One of the issue encountered is, when a diff has more than 55K lines.This issue is not of 'gotrufflehog', its a package used go-git panics.
   More about the issue 
-  'https://github.com/src-d/go-git/issues/973'
-  'https://github.com/sergi/go-diff/issues/89' 
+  - 'https://github.com/src-d/go-git/issues/973'
+  - 'https://github.com/sergi/go-diff/issues/89' 
   

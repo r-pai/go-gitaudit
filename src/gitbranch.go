@@ -61,7 +61,7 @@ func (branch *GitBranch) Search() {
 		return
 	}
 
-	searchChan, wg := branch.createPatchSearchers()
+	searchChan, wg := branch.createSearchers()
 
 	var prevCommit *object.Commit
 	prevCommit = nil
@@ -86,7 +86,15 @@ func (branch *GitBranch) Search() {
 				patch:      patch,
 				prevCommit: prevCommit}
 
+		} else {
+			noOfCommits++
+			searchChan <- SearchDetails{
+				branch: branch,
+				commit: c,
+			}
+
 		}
+
 		prevCommit = c
 		return nil
 	})
@@ -95,22 +103,22 @@ func (branch *GitBranch) Search() {
 	wg.Wait()
 }
 
-//createPatchSearchers creates go routines, which will search on the diff
+//createSearchers creates go routines, which will search on the diff
 //Workers are created for each branch
-func (branch *GitBranch) createPatchSearchers() (chan SearchDetails, *sync.WaitGroup) {
+func (branch *GitBranch) createSearchers() (chan SearchDetails, *sync.WaitGroup) {
 	searchChan := make(chan SearchDetails, 100)
 	var wg sync.WaitGroup
 	wg.Add(workers)
 
 	for w := 1; w <= workers; w++ {
-		go branch.patchSearcher(w, &wg, searchChan)
+		go branch.searcher(w, &wg, searchChan)
 	}
 
 	return searchChan, &wg
 }
 
-//patchSearcher searches the patch aginst all the rules and prints the output
-func (branch *GitBranch) patchSearcher(id int, wg *sync.WaitGroup, searchChan <-chan SearchDetails) {
+//searcher searches the patch aginst all the rules and prints the output
+func (branch *GitBranch) searcher(id int, wg *sync.WaitGroup, searchChan <-chan SearchDetails) {
 	for search := range searchChan {
 
 		var searchBranchOpts [2]*BranchSearchOptions
@@ -118,12 +126,11 @@ func (branch *GitBranch) patchSearcher(id int, wg *sync.WaitGroup, searchChan <-
 		searchBranchOpts[1] = &search.branch.searchCurrBranchOpt
 
 		for sBranchIndex := range searchBranchOpts {
-
 			//For allBranch rule(to be checked in all branches), we need only check a patche
 			//once and need not check in rest of the branches
 			//To keep track we would be using a allBranchallBranchCommitTracker,
 			//this has the sha256 as hask as the key and value its key in string as value
-			if searchBranchOpts[sBranchIndex].Branch == allBranch {
+			if searchBranchOpts[sBranchIndex].Branch == allBranch && search.prevCommit != nil {
 
 				sumStr := search.prevCommit.Hash.String() + search.commit.Hash.String()
 				sum := [sha256.Size]byte(sha256.Sum256([]byte(sumStr)))
@@ -137,21 +144,35 @@ func (branch *GitBranch) patchSearcher(id int, wg *sync.WaitGroup, searchChan <-
 
 			for key, searchString := range searchBranchOpts[sBranchIndex].RuleSet.Rules {
 				//fmt.Println(id, ": Searching ", searchString, "in ", c.branch, "...")
-				match, fPath, matchStr := search.branch.SearchInPatch(searchString, search.patch)
-				if match {
-					safe.Inc()
 
-					report := AuditReport{
-						RuleName:  searchBranchOpts[sBranchIndex].RuleSet.RuleName,
-						Rule:      key,
-						Hash:      search.commit.Hash.String(),
-						Time:      search.commit.Committer.When.Format("Mon Jan _2 15:04:05 2006"),
-						Committer: search.commit.Committer.Name,
-						FilePath:  fPath,
-						Branch:    search.branch.branchName.String(),
-						Match:     matchStr,
+				match := false
+				var fPaths []string
+				var matchStrs []string
+
+				if search.commit != nil && search.prevCommit == nil {
+					match, fPaths, matchStrs = search.branch.SearchInFile(searchString, search.commit)
+				} else if search.commit != nil && search.prevCommit != nil {
+					match, fPaths, matchStrs = search.branch.SearchInPatch(searchString, search.patch)
+				} else {
+					fmt.Println("Error: Unable to search")
+				}
+
+				if match {
+					for i := range matchStrs {
+						safe.Inc()
+
+						report := AuditReport{
+							RuleName:  searchBranchOpts[sBranchIndex].RuleSet.RuleName,
+							Rule:      key,
+							Hash:      search.commit.Hash.String(),
+							Time:      search.commit.Committer.When.Format("Mon Jan _2 15:04:05 2006"),
+							Committer: search.commit.Committer.Name,
+							FilePath:  fPaths[i],
+							Branch:    search.branch.branchName.String(),
+							Match:     matchStrs[i],
+						}
+						report.print()
 					}
-					report.print()
 				}
 
 			}
@@ -160,16 +181,54 @@ func (branch *GitBranch) patchSearcher(id int, wg *sync.WaitGroup, searchChan <-
 	wg.Done()
 }
 
+//SearchInFile searches the searchString in file , if a match is found we will just come out.
+//searchString can be a regular experssion
+func (branch *GitBranch) SearchInFile(searchString string, c *object.Commit) (bool, []string, []string) {
+
+	var fPaths []string
+	var matchs []string
+	search := false
+
+	fIter, _ := c.Files()
+	err := fIter.ForEach(func(f *object.File) error {
+		lines, err := f.Lines()
+		if err == nil {
+			for _, line := range lines {
+				re := regexp.MustCompile(searchString)
+				match := re.Find([]byte(line))
+				if match != nil {
+
+					search = true
+					fPaths = append(fPaths, f.Name)
+					matchs = append(matchs, string(match))
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		fmt.Println("Error search in File", err.Error())
+	}
+
+	return search, matchs, fPaths
+}
+
 //SearchInPatch searches the searchString in patch , if a match is found we will just come out.
 //searchString can be a regular experssion
-func (branch *GitBranch) SearchInPatch(searchString string, p *object.Patch) (bool, string, string) {
-	fPath := ""
+func (branch *GitBranch) SearchInPatch(searchString string, p *object.Patch) (bool, []string, []string) {
+
+	var fPaths []string
+	var matchs []string
+	search := false
 	for _, f := range p.FilePatches() {
 		if !f.IsBinary() {
 			for _, c := range f.Chunks() {
 
 				re := regexp.MustCompile(searchString)
 				match := re.Find([]byte(c.Content()))
+				fPath := ""
 				if match != nil {
 					from, to := f.Files()
 					if from != nil {
@@ -180,11 +239,13 @@ func (branch *GitBranch) SearchInPatch(searchString string, p *object.Patch) (bo
 						}
 					}
 
-					return true, fPath, string(match)
+					search = true
+					fPaths = append(fPaths, fPath)
+					matchs = append(matchs, string(match))
 				}
 			}
 		}
 	}
 
-	return false, "", ""
+	return search, matchs, fPaths
 }
