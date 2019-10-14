@@ -3,7 +3,6 @@ package gitsearch
 import (
 	"flag"
 	"fmt"
-	"os"
 	"strconv"
 )
 
@@ -35,20 +34,14 @@ func (gsArgs *GSArgs) Validate() error {
 
 	if "" == *gsArgs.gitURL {
 		flag.PrintDefaults()
-		err := fmt.Errorf("argument giturl should not be empty")
+		err := fmt.Errorf("Argument 'giturl' should not be empty")
 		return err
 	}
 
 	if "" == *gsArgs.rulesFile {
-		insDir, _ := os.Getwd()
-		defRuleFile := insDir + "/" + searchOptsFile
-		if _, err := os.Stat(defRuleFile); err != nil {
-			if os.IsNotExist(err) {
-				err := fmt.Errorf("default rulesfile %s not found", searchOptsFile)
-				return err
-			}
-		}
-		*gsArgs.rulesFile = defRuleFile
+		flag.PrintDefaults()
+		err := fmt.Errorf("Argument 'rulesfile' should not be empty")
+		return err
 	}
 
 	return nil

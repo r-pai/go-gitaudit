@@ -2,6 +2,7 @@
   This project is inspired from [trufflehog](https://github.com/dxa4481/truffleHog) and the default basic search expressions are from trufflehog. 
   
   go-gitaudit searches deep in commit history, in any branch or entire repository to find any thing you looking for.
+  The repository can be a git url or can be a local repostitory path.
  
   **Features**
   - Uses golang go-git package
@@ -9,6 +10,7 @@
   - Configuration using json file.
   - Branch wise search support.
   - Faster, as search is done in parallel.
+  - Searches local repository
 
  
 # Installation
@@ -21,19 +23,19 @@
 $ go get -u github.com/r-pai/go-gitaudit/...
 $ cd $GOPATH/src/github.com/r-pai/go-gitaudit
 $ go install
-$ go-gitaudit --giturl <url>
+$ go-gitaudit --giturl=<url> --rulesfile=<url/localRepoPath>
 ```
 # Help 
 ```
 Usage : 
 go-gitaudit 
   -giturl string
-    	git repository URL
-  -json
-    	Output format to be json (true or false). (default true)
+    	git repository URL/local repository path
   -rulesfile string
     	rules file path. 
     	For json format refer file defaultrule.json.
+  -json
+    	Output format to be json (true or false). (default true)
   -worker int
     	number of workers for parallel processing (max 10) (default 1
 ```
@@ -43,17 +45,13 @@ go-gitaudit
 Basic command for go-gitaudit. 
 
 ```
-$./go-gitaudit --giturl=<url>
+$./go-gitaudit --giturl=<url/localrepo> --rulesfile=<rulesfilepath>
 ```
 
-go-gitaudit with new Rules File
-```
-$./go-gitaudit --giturl=<url> --rulesfile=<rulesfilepath>
-```
 
 go-gitaudit output format is by default json (only for a rule). To change 
 ```
-$./go-gitaudit --giturl=<url> --json=false
+$./go-gitaudit --giturl=<url> --rulesfile=<rulesfilepath> --json=false
 ```
 
 # rulesfile format
