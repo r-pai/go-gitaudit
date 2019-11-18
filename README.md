@@ -1,8 +1,8 @@
-# go-gitaudit
+# go-gitaudit or gitaudit
   This project is inspired from [trufflehog](https://github.com/dxa4481/truffleHog) and the default basic search expressions are from trufflehog. 
   
-  go-gitaudit searches deep in commit history, in any branch or entire repository to find any thing you looking for.
-  The repository can be a git url or can be a local repostitory path.
+  go-gitaudit is a tool written in golang. gitaudit searches in deep in the git repository commit history, in any branch or entire repository to find any thing you looking for like secrets or any passwords or aws key.
+The repository can be a git url or can be a local repostitory path.
  
   **Features**
   - Uses golang go-git package
